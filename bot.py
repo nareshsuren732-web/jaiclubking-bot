@@ -19,51 +19,40 @@ HISTORY_FILE = "scrape_history.json"
 message_count = 0
 start_time = datetime.datetime.now()
 
-# ==================== KEEP-ALIVE FUNCTION ====================
+# ==================== KEEP-ALIVE ====================
 
 def keep_alive():
-    """Keep the bot alive by logging status every minute"""
     while True:
         uptime = datetime.datetime.now() - start_time
         hours = uptime.seconds // 3600
         minutes = (uptime.seconds % 3600) // 60
-        print(f"💚 Bot is alive! Uptime: {hours}h {minutes}m | Messages: {message_count}")
+        print(f"💚 Bot alive! Uptime: {hours}h {minutes}m | Messages: {message_count}")
         time.sleep(60)
 
-# ==================== SCRAPE FUNCTION ====================
+# ==================== SCRAPE ====================
 
 def scrape_bdgdu():
-    """Scrape data from bdgdu.com using Playwright"""
     try:
         from playwright.sync_api import sync_playwright
-        
         with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox']
-            )
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
             page = browser.new_page()
-            
             page.goto("http://bdgdu.com/#/", timeout=60000)
             page.wait_for_load_state("networkidle")
             time.sleep(3)
-            
             title = page.title()
             links = page.eval_on_selector_all('a', 'els => els.map(el => el.href)')
-            
             game_data = []
             try:
-                elements = page.query_selector_all('[class*="game"], [class*="result"], [class*="color"], [class*="number"]')
+                elements = page.query_selector_all('[class*="game"], [class*="result"]')
                 for el in elements[:20]:
                     text = el.inner_text()
                     if text.strip():
                         game_data.append(text)
             except:
                 pass
-            
             body_text = page.inner_text('body')
             browser.close()
-            
             data = {
                 "success": True,
                 "title": title,
@@ -73,35 +62,28 @@ def scrape_bdgdu():
                 "body_preview": body_text[:500],
                 "timestamp": datetime.datetime.now().isoformat()
             }
-            
             with open(DATA_FILE, "w") as f:
                 json.dump(data, f, indent=2)
-            
             save_history(data)
             return data
-            
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# ==================== STORE FUNCTIONS ====================
+# ==================== STORE ====================
 
 def save_history(data):
     history = []
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, "r") as f:
             history = json.load(f)
-    
     history.append({
         "timestamp": datetime.datetime.now().isoformat(),
         "title": data.get("title", "N/A"),
         "links_count": data.get("links_count", 0),
-        "game_data_count": len(data.get("game_data", [])),
-        "data": data
+        "game_data_count": len(data.get("game_data", []))
     })
-    
     if len(history) > 50:
         history = history[-50:]
-    
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f, indent=2)
 
@@ -126,7 +108,7 @@ def get_stats():
         "current_data": current is not None
     }
 
-# ==================== TELEGRAM FUNCTIONS ====================
+# ==================== TELEGRAM ====================
 
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -141,34 +123,31 @@ def send_message(chat_id, text):
 
 def send_typing(chat_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendChatAction"
-    payload = {"chat_id": chat_id, "action": "typing"}
     try:
-        requests.post(url, json=payload, timeout=5)
+        requests.post(url, json={"chat_id": chat_id, "action": "typing"}, timeout=5)
     except:
         pass
 
-# ==================== COMMAND HANDLERS ====================
+# ==================== COMMANDS ====================
 
 def handle_start():
     uptime = datetime.datetime.now() - start_time
     hours = uptime.seconds // 3600
     minutes = (uptime.seconds % 3600) // 60
-    
     return f"""🎯 <b>JA CLUB KING BOT</b> ✅
 
 📌 <b>Commands:</b>
-/ping - Check bot status
-/time - Current server time
-/scrape - Scrape & store data
-/show - Show current data
-/history - Show scrape history
-/stats - Storage statistics
+/ping - Check bot
+/time - Current time
+/scrape - Scrape & store
+/show - Show data
+/history - Show history
+/stats - Storage stats
 /help - Help menu
 /about - About bot
 
-🕐 <b>Uptime:</b> {hours}h {minutes}m
-📊 <b>Messages:</b> {message_count}
-
+🕐 Uptime: {hours}h {minutes}m
+📊 Messages: {message_count}
 💾 Data store enabled!
 🤖 24/7 Running!"""
 
@@ -176,80 +155,50 @@ def handle_ping():
     uptime = datetime.datetime.now() - start_time
     hours = uptime.seconds // 3600
     minutes = (uptime.seconds % 3600) // 60
-    return f"""🏓 <b>Pong!</b>
+    return f"""🏓 Pong!
 
-✅ Bot is alive!
+✅ Bot alive!
 🕐 Uptime: {hours}h {minutes}m
-📊 Total messages: {message_count}
-💚 Status: Active"""
+📊 Messages: {message_count}"""
 
 def handle_time():
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return f"🕐 <b>Server Time:</b> {now}"
+    return f"🕐 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
 def handle_scrape(chat_id):
-    send_message(chat_id, "⏳ Scraping in progress...")
+    send_message(chat_id, "⏳ Scraping...")
     data = scrape_bdgdu()
-    
     if data["success"]:
-        return f"""✅ <b>Scraping Complete!</b>
-        
-📌 <b>Title:</b> {data['title']}
-🔗 <b>Links Found:</b> {data['links_count']}
-🎯 <b>Game Data:</b> {len(data['game_data'])} items
-📝 <b>Preview:</b> {data['body_preview'][:200]}...
+        return f"""✅ Scraping Complete!
 
-💾 <b>Data Stored!</b>
-🕐 Time: {data['timestamp']}
-
-📊 Type /show to see data
-📈 Type /history for all scrapes"""
-    else:
-        return f"❌ Error: {data['error']}"
+📌 Title: {data['title']}
+🔗 Links: {data['links_count']}
+🎯 Game Data: {len(data['game_data'])} items
+💾 Data Stored!
+🕐 {data['timestamp']}"""
+    return f"❌ Error: {data['error']}"
 
 def handle_show():
     data = load_current_data()
-    
     if data and data.get("success"):
         game_text = "\n".join([f"  🎯 {item}" for item in data.get('game_data', [])[:5]])
-        if not game_text:
-            game_text = "  No game data found"
-        
-        return f"""📊 <b>Current Scraped Data</b>
+        return f"""📊 Current Data
 
-📌 <b>Title:</b> {data.get('title', 'N/A')}
-🔗 <b>Links Found:</b> {data.get('links_count', 0)}
-🎯 <b>Game Data:</b> {len(data.get('game_data', []))} items
-🕐 <b>Scraped At:</b> {data.get('timestamp', 'N/A')}
+📌 Title: {data.get('title', 'N/A')}
+🔗 Links: {data.get('links_count', 0)}
+🎯 Game Data: {len(data.get('game_data', []))} items
+🕐 Scraped: {data.get('timestamp', 'N/A')}
 
-<b>📋 Game Data Items:</b>
-{game_text}
-
-📝 <b>Preview:</b>
-{data.get('body_preview', 'N/A')[:200]}...
-
-💾 <b>File:</b> {DATA_FILE}"""
-    else:
-        return "❌ No scraped data found! Type /scrape first."
+📋 Game Data:
+{game_text if game_text else '  No game data'}"""
+    return "❌ No data! Type /scrape first."
 
 def handle_history():
     history = load_history()
-    
     if not history:
-        return "❌ No scrape history found! Type /scrape first."
-    
-    msg = f"""📚 <b>Scrape History</b> (Last 10)
-    
-📊 <b>Total Scrapes:</b> {len(history)}
-"""
-    
+        return "❌ No history! Type /scrape first."
+    msg = f"📚 Scrape History (Last 10)\n📊 Total: {len(history)}\n"
     for i, entry in enumerate(history[-10:], 1):
-        msg += f"""
-{i}. 🕐 {entry.get('timestamp', 'N/A')[:16]}
-   📌 {entry.get('title', 'N/A')}
-   🔗 Links: {entry.get('links_count', 0)}
-   🎯 Games: {entry.get('game_data_count', 0)}"""
-    
+        msg += f"\n{i}. 🕐 {entry.get('timestamp', 'N/A')[:16]}\n   📌 {entry.get('title', 'N/A')}\n   🔗 {entry.get('links_count', 0)} links"
     return msg
 
 def handle_stats():
@@ -257,66 +206,55 @@ def handle_stats():
     uptime = datetime.datetime.now() - start_time
     hours = uptime.seconds // 3600
     minutes = (uptime.seconds % 3600) // 60
-    
-    return f"""📊 <b>Bot Statistics</b>
+    return f"""📊 Bot Statistics
 
-🤖 <b>Bot:</b> JA CLUB KING
-🕐 <b>Uptime:</b> {hours}h {minutes}m
-📊 <b>Messages:</b> {message_count}
+🤖 Bot: JA CLUB KING
+🕐 Uptime: {hours}h {minutes}m
+📊 Messages: {message_count}
 
-<b>📁 Storage Stats:</b>
-📌 <b>Total Scrapes:</b> {stats['total_scrapes']}
-🕐 <b>Last Scrape:</b> {stats['last_scrape']}
-📁 <b>Current Data:</b> {'✅ Yes' if stats['current_data'] else '❌ No'}
-
-💡 Type /scrape to add more data
-📊 Type /show to view data"""
+📁 Storage:
+📌 Total Scrapes: {stats['total_scrapes']}
+🕐 Last Scrape: {stats['last_scrape']}
+📁 Current Data: {'✅ Yes' if stats['current_data'] else '❌ No'}"""
 
 def handle_help():
-    return f"""📚 <b>Help Menu</b>
+    return """📚 Help Menu
 
-🔄 <b>Data Commands:</b>
-/scrape - Scrape & store data
-/show - Show current data
-/history - Show scrape history
-/stats - Show storage stats
-
-ℹ️ <b>Info Commands:</b>
-/ping - Check bot status
-/time - Current server time
-/start - Welcome message
-/help - This menu
+/scrape - Scrape & store
+/show - Show data
+/history - Show history
+/stats - Storage stats
+/ping - Check bot
+/time - Current time
+/start - Welcome
 /about - About bot
+/help - This menu
 
-🤖 Bot runs 24/7!
-💾 Data store enabled!"""
+💾 Data store enabled!
+🤖 24/7 Running!"""
 
 def handle_about():
     uptime = datetime.datetime.now() - start_time
     hours = uptime.seconds // 3600
     minutes = (uptime.seconds % 3600) // 60
-    
-    return f"""🤖 <b>About JA CLUB KING BOT</b>
+    return f"""🤖 About JA CLUB KING BOT
 
-📌 <b>Bot Name:</b> JA CLUB KING
-🔑 <b>Version:</b> 1.0.0
-🕐 <b>Uptime:</b> {hours}h {minutes}m
-📊 <b>Messages:</b> {message_count}
+📌 Name: JA CLUB KING
+🔑 Version: 1.0.0
+🕐 Uptime: {hours}h {minutes}m
+📊 Messages: {message_count}
 
-<b>Features:</b>
+Features:
 ✅ 24/7 Running
 ✅ Webhook enabled
 ✅ Data storage
-✅ Scraping support
+✅ Scraping support"""
 
-<b>Developer:</b> @YourUsername"""
-
-# ==================== MAIN HANDLER ====================
+# ==================== PROCESS ====================
 
 def process_message(chat_id, text):
     global message_count
     message_count += 1
-    
     send_typing(chat_id)
     time.sleep(0.5)
     
@@ -339,11 +277,10 @@ def process_message(chat_id, text):
     elif text == "/about":
         reply = handle_about()
     else:
-        reply = f"📨 You said: <b>{text}</b>\n\nType /help for commands."
-    
+        reply = f"📨 You said: {text}\n\nType /help"
     return reply
 
-# ==================== FLASK ROUTES ====================
+# ==================== FLASK ====================
 
 @app.route('/')
 def home():
@@ -354,31 +291,24 @@ def webhook():
     try:
         data = request.json
         print(f"📨 Received: {data}")
-        
         if "message" in data:
             chat_id = data["message"]["chat"]["id"]
             text = data["message"].get("text", "")
-            
             reply = process_message(chat_id, text)
             send_message(chat_id, reply)
-            
             return jsonify({"status": "ok"})
-        
         return jsonify({"status": "no message"})
-        
     except Exception as e:
-        print(f"❌ Webhook Error: {e}")
+        print(f"❌ Error: {e}")
         return jsonify({"status": "error"}), 500
 
 # ==================== MAIN ====================
 
 if __name__ == "__main__":
     print("🤖 JA CLUB KING BOT is starting...")
-    print(f"🔑 Token: {BOT_TOKEN[:10]}...")
     print("✅ Scrape + Store enabled!")
     print("✅ 24/7 mode enabled!")
     
-    # Start keep-alive thread
     thread = threading.Thread(target=keep_alive, daemon=True)
     thread.start()
     
